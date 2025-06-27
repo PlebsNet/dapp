@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getCsrfToken, signIn } from 'next-auth/react';
-import { SiweMessage } from 'siwe';
-import { useAccount, useConnect, useSignMessage } from 'wagmi';
-import { cbWalletConnector } from "@/lib/wagmiConfig";
-import { toast } from "sonner";
-import { Button } from './ui/Button';
+import React from "react";
+import { Button } from "./ui/Button";
+import {
+  useWeb3AuthConnect,
+  useWeb3AuthDisconnect,
+  useWeb3AuthUser,
+} from "@web3auth/modal/react";
+import { useAccount } from "wagmi";
 
 interface ConnectAndSIWEProps {
   onConnectChange?: (connected: boolean) => void;
@@ -12,125 +13,19 @@ interface ConnectAndSIWEProps {
 }
 
 export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [processingStep, setProcessingStep] = useState('');
-  const [isSignedIn, setIsSignedIn] = useState(false);
-
-  const { address, isConnected } = useAccount();
-  const { connect } = useConnect();
-  const { signMessageAsync } = useSignMessage();
-
-  // Handle SIWE sign-in
-  const handleSignIn = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError('');
-      setProcessingStep('Getting authentication nonce...');
-
-      if (!isConnected || !address) {
-        throw new Error('No wallet address found. Please check your wallet connection.');
-      }
-
-      // 1. Get a nonce from your API
-      const nonceRes = await fetch('/api/auth/nonce');
-      const { nonce } = await nonceRes.json();
-      if (!nonce) {
-        throw new Error('Failed to get nonce!');
-      }
-      console.log('✅ Received nonce:', nonce);
-
-      // 2. Get CSRF token - needed for NextAuth
-      const csrfToken = await getCsrfToken();
-      if (!csrfToken) {
-        throw new Error('Failed to get CSRF token');
-      }
-      console.log('✅ Got CSRF token');
-
-      // 3. Create SIWE message with EXACT domain format
-      const domain = window.location.host.split(':')[0]; // Get hostname without port
-      const message = new SiweMessage({
-        domain,
-        address,
-        statement: 'Sign in with Ethereum to the app.',
-        uri: window.location.origin,
-        version: '1',
-        chainId: 1, // I need to work on this!
-        nonce
-      });
-
-      // Convert to string for signing
-      const messageString = message.prepareMessage();
-      console.log('✅ Prepared message:', messageString);
-
-      // 4. Sign the message with the wallet
-      setProcessingStep('Please sign the message in your wallet...');
-      const signature = await signMessageAsync({ message: messageString });
-      console.log('✅ Got signature:', signature);
-
-      // 5. Verify the signature
-      setProcessingStep('Verifying signature...');
-      const response = await signIn('siwe', {
-        message: message.prepareMessage(),
-        signature,
-        redirect: false,
-        callbackUrl: '/' // Where to redirect after successful sign-in
-      });
-
-      if (response?.error) {
-        console.error('❌ Sign-in error:', response.error);
-        throw new Error(`Sign-in error: ${response.error}`);
-      } else {
-        console.log('✅ Successfully authenticated!');
-        setProcessingStep('Success! Redirecting...');
-        // Redirect or update UI as needed
-        window.location.href = response?.url || '/';
-        setIsSignedIn(true);
-      }
-    } catch (e) {
-      console.error('❌ Authentication error:', e);
-      setError(`${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setIsLoading(false);
-      setProcessingStep('');
-    }
-  }, [isConnected, address, signMessageAsync]);
-
-  // Handle wallet connection separately
-  const handleWalletConnect = async () => {
-    try {
-      setIsLoading(true);
-      setError('');
-      setProcessingStep('Connecting wallet...');
-
-      // Connect the wallet and wait for the connection
-      await connect({ connector: cbWalletConnector });
-      console.log('✅ Wallet connection initiated');
-    } catch (e) {
-      console.error('❌ Connection error:', e);
-      setError(`Wallet connection error: ${e instanceof Error ? e.message : String(e)}`);
-      setIsLoading(false);
-      setProcessingStep('');
-    }
-  };
-
-  // Automatically trigger sign-in when wallet connection completes
-  useEffect(() => {
-    if (isConnected && !isSignedIn) {
-      handleSignIn();
-    }
-  }, [isConnected, isSignedIn, handleSignIn]);
-
-  useEffect(() => {
-    if (processingStep) {
-      toast(processingStep);
-    }
-  }, [processingStep]);
-
-  // Trigger the "connect wallet" flow, which will then trigger sign-in
-  const handleConnectAndSignIn = () => {
-    handleWalletConnect();
-  };
+  const {
+    connect,
+    isConnected,
+    loading: connectLoading,
+    error: connectError,
+  } = useWeb3AuthConnect();
+  const {
+    disconnect,
+    loading: disconnectLoading,
+    error: disconnectError,
+  } = useWeb3AuthDisconnect();
+  const { userInfo } = useWeb3AuthUser();
+  const { address, connector } = useAccount();
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -138,27 +33,35 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
         // Not connected - show the connect button
         <Button
           size="lg"
-          onClick={handleConnectAndSignIn}
-          disabled={isLoading}
+          onClick={connect}
+          disabled={connectLoading}
           className="w-full text-md bg-[#0052ff] text-gray-50"
         >
-          {isLoading ? 'Connecting...' : 'Connect with Base'}
+          Connect with web3Auth
         </Button>
       ) : (
-        // Already connected - show fallback sign in button for Next Auth
-        <Button
-          size="xl"
-          onClick={handleSignIn}
-          disabled={isLoading}
-          className="w-full text-md bg-[#0052ff] text-gray-50"
-        >
-          {isLoading ? 'Signing in...' : 'Sign in with Base'}
-        </Button>
+        <>
+          <p> {address} </p>
+          <Button
+            size="lg"
+            onClick={() => disconnect()}
+            disabled={disconnectLoading}
+            className="w-full text-md bg-[#0052ff] text-gray-50"
+          >
+            Disconnect
+          </Button>
+        </>
       )}
 
-      {error && (
+      {connectError && (
         <div className="mt-2 text-red-500 text-sm">
-          {error}
+          {connectError.toString()}
+        </div>
+      )}
+
+      {disconnectError && (
+        <div className="mt-2 text-red-500 text-sm">
+          {disconnectError.toString()}
         </div>
       )}
 
