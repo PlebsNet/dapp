@@ -1,11 +1,24 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "./ui/Button";
 import {
   useWeb3AuthConnect,
   useWeb3AuthDisconnect,
-  useWeb3AuthUser,
 } from "@web3auth/modal/react";
 import { useAccount } from "wagmi";
+import useDelegatorAccount from "@/hooks/useDelegatorAccount";
+import useDelegateAccount from "@/hooks/useDelegateAccount";
+import {
+  prepareDelegation,
+  prepareRedeemDelegation,
+} from "@/lib/delegationUtils";
+import {
+  Delegation,
+  getDeleGatorEnvironment,
+} from "@metamask/delegation-toolkit";
+import usePimlicoUtils from "@/hooks/usePimlicoUtils";
+import { baseSepolia } from "viem/chains";
+import { Hex } from "viem";
+import { getUserOperationHash } from "viem/account-abstraction";
 
 interface ConnectAndSIWEProps {
   onConnectChange?: (connected: boolean) => void;
@@ -24,8 +37,67 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
     loading: disconnectLoading,
     error: disconnectError,
   } = useWeb3AuthDisconnect();
-  const { userInfo } = useWeb3AuthUser();
-  const { address, connector } = useAccount();
+  const { address } = useAccount();
+  const { account: delegatorSmartAccount } = useDelegatorAccount();
+  const { account: delegateSmartAccount } = useDelegateAccount();
+  const [delegation, setDelegation] = useState<Delegation>();
+  const [redeemDelegationHash, setRedeemDelegationHash] = useState<Hex>();
+  const { pimlicoClient, bundlerClient, paymasterClient } = usePimlicoUtils();
+
+  const handleCreateDelegation = async () => {
+    if (!delegateSmartAccount || !delegatorSmartAccount) {
+      return;
+    }
+
+    const delegation = prepareDelegation(
+      delegatorSmartAccount,
+      delegateSmartAccount.address,
+    );
+
+    const signature = await delegatorSmartAccount.signDelegation({
+      delegation,
+    });
+
+    const signedDelegation = {
+      ...delegation,
+      signature,
+    };
+
+    setDelegation(signedDelegation);
+
+    console.log(signedDelegation);
+  };
+
+  const handleRedeemDelegation = async () => {
+    if (
+      !delegation ||
+      !delegatorSmartAccount ||
+      !pimlicoClient ||
+      !delegateSmartAccount
+    ) {
+      return;
+    }
+    const redeemData = prepareRedeemDelegation(delegation);
+    const { fast: fee } = await pimlicoClient?.getUserOperationGasPrice();
+
+    const userOperationHash = await bundlerClient!.sendUserOperation({
+      account: delegateSmartAccount,
+      calls: [
+        {
+          to: getDeleGatorEnvironment(baseSepolia.id).DelegationManager,
+          data: redeemData,
+        },
+      ],
+      ...fee,
+      paymaster: paymasterClient,
+    });
+
+    const { receipt } = await bundlerClient!.waitForUserOperationReceipt({
+      hash: userOperationHash,
+    });
+
+    setRedeemDelegationHash(receipt.transactionHash);
+  };
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -41,7 +113,9 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
         </Button>
       ) : (
         <>
-          <p> {address} </p>
+          <p> Your Account: {address} </p>
+          <p> Delegator: {delegatorSmartAccount?.address} </p>
+          <p> Delegate: {delegateSmartAccount?.address} </p>
           <Button
             size="lg"
             onClick={() => disconnect()}
@@ -50,8 +124,29 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
           >
             Disconnect
           </Button>
+          {!delegation && (
+            <Button
+              size="lg"
+              onClick={() => handleCreateDelegation()}
+              disabled={disconnectLoading}
+              className="w-full text-md bg-[#0052ff] text-gray-50"
+            >
+              Create Delegation
+            </Button>
+          )}
         </>
       )}
+      {delegation && !redeemDelegationHash && (
+        <Button
+          size="lg"
+          onClick={() => handleRedeemDelegation()}
+          disabled={disconnectLoading}
+          className="w-full text-md bg-[#0052ff] text-gray-50"
+        >
+          Redeem Delegation
+        </Button>
+      )}
+      {redeemDelegationHash && <p> Delegation Transaction hash: {redeemDelegationHash} </p>}
 
       {connectError && (
         <div className="mt-2 text-red-500 text-sm">

@@ -21,6 +21,7 @@ import { multivaultAbi } from "@/lib/abis/multivault";
 import { baseSepolia } from "viem/chains";
 import { useContractRead } from "wagmi";
 import { useGetTriplesWithPositionsQuery } from "@0xintuition/graphql";
+import { question } from "@/app/(admin)/data/question";
 
 const ANIM = { duration: 0.3 };
 const STORAGE_ANS = "plebs_answers_web3";
@@ -384,7 +385,9 @@ export default function Web3Assessment() {
   const allAnswered = Object.keys(answers).length === total;
   const answeredCount = Object.keys(answers).length;
   const remainingCount = total - answeredCount;
-  const visible = questions.slice(0, answeredCount);
+  const visible = questions;
+  console.log(questions)
+  console.log(visible)
 
   return (
     <form onSubmit={handleSubmit} className="p-4 max-w-2xl mx-auto">
