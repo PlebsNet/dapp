@@ -41,8 +41,6 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
   const { account: delegatorSmartAccount } = useDelegatorAccount();
   const { account: delegateSmartAccount } = useDelegateAccount();
   const [delegation, setDelegation] = useState<Delegation>();
-  const [redeemDelegationHash, setRedeemDelegationHash] = useState<Hex>();
-  const { pimlicoClient, bundlerClient, paymasterClient } = usePimlicoUtils();
 
   const handleCreateDelegation = async () => {
     if (!delegateSmartAccount || !delegatorSmartAccount) {
@@ -66,37 +64,6 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
     setDelegation(signedDelegation);
 
     console.log(signedDelegation);
-  };
-
-  const handleRedeemDelegation = async () => {
-    if (
-      !delegation ||
-      !delegatorSmartAccount ||
-      !pimlicoClient ||
-      !delegateSmartAccount
-    ) {
-      return;
-    }
-    const redeemData = prepareRedeemDelegation(delegation);
-    const { fast: fee } = await pimlicoClient?.getUserOperationGasPrice();
-
-    const userOperationHash = await bundlerClient!.sendUserOperation({
-      account: delegateSmartAccount,
-      calls: [
-        {
-          to: getDeleGatorEnvironment(baseSepolia.id).DelegationManager,
-          data: redeemData,
-        },
-      ],
-      ...fee,
-      paymaster: paymasterClient,
-    });
-
-    const { receipt } = await bundlerClient!.waitForUserOperationReceipt({
-      hash: userOperationHash,
-    });
-
-    setRedeemDelegationHash(receipt.transactionHash);
   };
 
   return (
@@ -136,17 +103,6 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
           )}
         </>
       )}
-      {delegation && !redeemDelegationHash && (
-        <Button
-          size="lg"
-          onClick={() => handleRedeemDelegation()}
-          disabled={disconnectLoading}
-          className="w-full text-md bg-[#0052ff] text-gray-50"
-        >
-          Redeem Delegation
-        </Button>
-      )}
-      {redeemDelegationHash && <p> Delegation Transaction hash: {redeemDelegationHash} </p>}
 
       {connectError && (
         <div className="mt-2 text-red-500 text-sm">

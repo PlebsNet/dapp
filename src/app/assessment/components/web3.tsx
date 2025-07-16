@@ -22,6 +22,17 @@ import { baseSepolia } from "viem/chains";
 import { useContractRead } from "wagmi";
 import { useGetTriplesWithPositionsQuery } from "@0xintuition/graphql";
 import { question } from "@/app/(admin)/data/question";
+import useDelegateAccount from "@/hooks/useDelegateAccount";
+import useDelegatorAccount from "@/hooks/useDelegatorAccount";
+import {
+  prepareDelegation,
+  prepareRedeemDelegation,
+} from "@/lib/delegationUtils";
+import {
+  Delegation,
+  getDeleGatorEnvironment,
+} from "@metamask/delegation-toolkit";
+import usePimlicoUtils from "@/hooks/usePimlicoUtils";
 
 const ANIM = { duration: 0.3 };
 const STORAGE_ANS = "plebs_answers_web3";
@@ -45,10 +56,41 @@ export default function Web3Assessment() {
   const { address } = useAccount();
   const currentChainId = useChainId();
   const total = questions.length;
-  const { containerRef, dimensions } = useContainerSize();
+  const { containerRef } = useContainerSize();
   const { writeContractAsync, onReceipt } = useDepositTriple(
     MULTIVAULT_CONTRACT_ADDRESS,
   );
+  const { account: delegateSmartAccount } = useDelegateAccount();
+  const { account: delegatorSmartAccount } = useDelegatorAccount();
+  const [delegation, setDelegation] = useState<Delegation>();
+  const { pimlicoClient, bundlerClient, paymasterClient } = usePimlicoUtils();
+
+  useEffect(() => {
+    const handleCreateDelegation = async () => {
+      if (!delegateSmartAccount || !delegatorSmartAccount) {
+        return;
+      }
+
+      const delegation = prepareDelegation(
+        delegatorSmartAccount,
+        delegateSmartAccount.address,
+      );
+
+      const signature = await delegatorSmartAccount.signDelegation({
+        delegation,
+      });
+
+      const signedDelegation = {
+        ...delegation,
+        signature,
+      };
+
+      setDelegation(signedDelegation);
+
+      console.log(signedDelegation);
+    };
+    handleCreateDelegation();
+  }, [delegatorSmartAccount, delegateSmartAccount]);
 
   // Get minimum deposit amount from contract
   const { data: generalConfig } = useContractRead({
@@ -197,66 +239,123 @@ export default function Web3Assessment() {
         (Number(minDeposit) * multiplier).toString(),
         18,
       );
-
-      try {
-        // Find the triple in positionsData to get the correct vault ID
+      const handleRedeemDelegation = async () => {
+        console.log("REDEEMING DELEGATION");
+        if (
+          !delegation ||
+          !delegatorSmartAccount ||
+          !pimlicoClient ||
+          !delegateSmartAccount
+        ) {
+          return;
+        }
+        const { fast: fee } = await pimlicoClient?.getUserOperationGasPrice();
         const triple = positionsData.triples.find(
           (t) => t.term_id === currentTx.tripleId.toString(),
         );
         if (!triple) {
           throw new Error("Triple not found in positions data");
         }
-
-        // Get the correct vault ID based on the answer
-        const vaultId =
-          answer <= 3 ? BigInt(triple.term_id) : BigInt(triple.counter_term_id);
-
-        const hash = await writeContractAsync({
-          address: MULTIVAULT_CONTRACT_ADDRESS as `0x${string}`,
-          abi: multivaultAbi as Abi,
-          functionName: "depositTriple",
-          args: [address as `0x${string}`, vaultId],
-          value: depositAmount,
-          chain: baseSepolia,
+        const redeemData = prepareRedeemDelegation(
+          delegation,
+          delegatorSmartAccount.address,
+          depositAmount,
+          triple.term_id,
+        );
+        const userOperationHash = await bundlerClient!.sendUserOperation({
+          account: delegateSmartAccount,
+          calls: [
+            {
+              to: getDeleGatorEnvironment(baseSepolia.id).DelegationManager,
+              data: redeemData,
+            },
+          ],
+          ...fee,
+          paymaster: paymasterClient,
         });
 
-        setTransactionStatuses((prev) => ({
-          ...prev,
-          [currentTx.questionId]: {
-            questionId: currentTx.questionId,
-            status: "success",
-            txHash: hash,
-          },
-        }));
-
-        onReceipt((receipt) => {
-          console.log("Transaction confirmed:", receipt);
+        const { receipt } = await bundlerClient!.waitForUserOperationReceipt({
+          hash: userOperationHash,
         });
-      } catch (err) {
-        setTransactionStatuses((prev) => ({
-          ...prev,
-          [currentTx.questionId]: {
-            questionId: currentTx.questionId,
-            status: "error",
-          },
-        }));
-        console.error("Error depositing triple:", err);
-        if (err instanceof Error) {
-          setFormError(
-            `Error: ${err.message}${err.cause ? ` (Cause: ${JSON.stringify(err.cause)})` : ""}`,
-          );
-        } else {
-          setFormError(`An unknown error occurred: ${JSON.stringify(err)}`);
-        }
-      }
 
-      // Remove processed transaction from queue
-      setPendingTransactions((prev) => prev.slice(1));
-      setIsProcessingQueue(false);
+        console.log("[TRANSACTION HASH]");
+        console.log(receipt.transactionHash);
+
+        //setRedeemDelegationHash(receipt.transactionHash);
+      };
+      handleRedeemDelegation();
+
+      /*
+            try {
+              // Find the triple in positionsData to get the correct vault ID
+              const triple = positionsData.triples.find(
+                (t) => t.term_id === currentTx.tripleId.toString(),
+              );
+              if (!triple) {
+                throw new Error("Triple not found in positions data");
+              }
+      
+              // Get the correct vault ID based on the answer
+              const vaultId =
+      positionsData,
+                answer <= 3 ? BigInt(triple.term_id) : BigInt(triple.counter_term_id);
+      
+              
+              const hash = await writeContractAsync({
+                address: MULTIVAULT_CONTRACT_ADDRESS as `0x${string}`,
+                abi: multivaultAbi as Abi,
+                functionName: "depositTriple",
+                args: [address as `0x${string}`, vaultId],
+                value: depositAmount,
+                chain: baseSepolia,
+              });
+      
+              setTransactionStatuses((prev) => ({
+                ...prev,
+                [currentTx.questionId]: {
+                  questionId: currentTx.questionId,
+                  status: "success",
+                  txHash: hash,
+                },
+              }));
+      
+              onReceipt((receipt) => {
+                console.log("Transaction confirmed:", receipt);
+              });
+            } catch (err) {
+              setTransactionStatuses((prev) => ({
+                ...prev,
+                [currentTx.questionId]: {
+                  questionId: currentTx.questionId,
+                  status: "error",
+                },
+              }));
+              console.error("Error depositing triple:", err);
+              if (err instanceof Error) {
+                setFormError(
+                  `Error: ${err.message}${err.cause ? ` (Cause: ${JSON.stringify(err.cause)})` : ""}`,
+                );
+              } else {
+                setFormError(`An unknown error occurred: ${JSON.stringify(err)}`);
+              }
+            }
+      
+            // Remove processed transaction from queue
+            setPendingTransactions((prev) => prev.slice(1));
+            setIsProcessingQueue(false);
+          };
+      
+          processQueue();
+          */
     };
-
-    processQueue();
+    processQueue()
   }, [
+    bundlerClient,
+    delegateSmartAccount,
+    delegatorSmartAccount,
+    delegation,
+    paymasterClient,
+    pimlicoClient,
     pendingTransactions,
     isProcessingQueue,
     address,
@@ -386,8 +485,8 @@ export default function Web3Assessment() {
   const answeredCount = Object.keys(answers).length;
   const remainingCount = total - answeredCount;
   const visible = questions;
-  console.log(questions)
-  console.log(visible)
+  console.log(questions);
+  console.log(visible);
 
   return (
     <form onSubmit={handleSubmit} className="p-4 max-w-2xl mx-auto">
