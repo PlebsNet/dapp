@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React  from "react";
 import { Button } from "./ui/Button";
 import {
   useWeb3AuthConnect,
@@ -6,19 +6,6 @@ import {
 } from "@web3auth/modal/react";
 import { useAccount } from "wagmi";
 import useDelegatorAccount from "@/hooks/useDelegatorAccount";
-import useDelegateAccount from "@/hooks/useDelegateAccount";
-import {
-  prepareDelegation,
-  prepareRedeemDelegation,
-} from "@/lib/delegationUtils";
-import {
-  Delegation,
-  getDeleGatorEnvironment,
-} from "@metamask/delegation-toolkit";
-import usePimlicoUtils from "@/hooks/usePimlicoUtils";
-import { baseSepolia } from "viem/chains";
-import { Hex } from "viem";
-import { getUserOperationHash } from "viem/account-abstraction";
 
 interface ConnectAndSIWEProps {
   onConnectChange?: (connected: boolean) => void;
@@ -39,34 +26,8 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
   } = useWeb3AuthDisconnect();
   const { address } = useAccount();
   const { account: delegatorSmartAccount } = useDelegatorAccount();
-  const { account: delegateSmartAccount } = useDelegateAccount();
-  const [delegation, setDelegation] = useState<Delegation>();
 
-  const handleCreateDelegation = async () => {
-    if (!delegateSmartAccount || !delegatorSmartAccount) {
-      return;
-    }
-
-    const delegation = prepareDelegation(
-      delegatorSmartAccount,
-      delegateSmartAccount.address,
-    );
-
-    const signature = await delegatorSmartAccount.signDelegation({
-      delegation,
-    });
-
-    const signedDelegation = {
-      ...delegation,
-      signature,
-    };
-
-    setDelegation(signedDelegation);
-
-    console.log(signedDelegation);
-  };
-
-  return (
+   return (
     <div className="flex flex-col items-center w-full">
       {!isConnected ? (
         // Not connected - show the connect button
@@ -82,7 +43,6 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
         <>
           <p> Your Account: {address} </p>
           <p> Delegator: {delegatorSmartAccount?.address} </p>
-          <p> Delegate: {delegateSmartAccount?.address} </p>
           <Button
             size="lg"
             onClick={() => disconnect()}
@@ -91,16 +51,6 @@ export const ConnectAndSIWE: React.FC<ConnectAndSIWEProps> = () => {
           >
             Disconnect
           </Button>
-          {!delegation && (
-            <Button
-              size="lg"
-              onClick={() => handleCreateDelegation()}
-              disabled={disconnectLoading}
-              className="w-full text-md bg-[#0052ff] text-gray-50"
-            >
-              Create Delegation
-            </Button>
-          )}
         </>
       )}
 

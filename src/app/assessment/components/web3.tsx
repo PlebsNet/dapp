@@ -33,6 +33,7 @@ import {
   getDeleGatorEnvironment,
 } from "@metamask/delegation-toolkit";
 import usePimlicoUtils from "@/hooks/usePimlicoUtils";
+import DynamicGraph from "@/components/ForceGraph3D";
 
 const ANIM = { duration: 0.3 };
 const STORAGE_ANS = "plebs_answers_web3";
@@ -56,7 +57,7 @@ export default function Web3Assessment() {
   const { address } = useAccount();
   const currentChainId = useChainId();
   const total = questions.length;
-  const { containerRef } = useContainerSize();
+  const { containerRef, dimensions } = useContainerSize();
   const { writeContractAsync, onReceipt } = useDepositTriple(
     MULTIVAULT_CONTRACT_ADDRESS,
   );
@@ -65,32 +66,29 @@ export default function Web3Assessment() {
   const [delegation, setDelegation] = useState<Delegation>();
   const { pimlicoClient, bundlerClient, paymasterClient } = usePimlicoUtils();
 
-  useEffect(() => {
-    const handleCreateDelegation = async () => {
-      if (!delegateSmartAccount || !delegatorSmartAccount) {
-        return;
-      }
+  const handleCreateDelegation = async () => {
+    if (!delegateSmartAccount || !delegatorSmartAccount) {
+      return;
+    }
 
-      const delegation = prepareDelegation(
-        delegatorSmartAccount,
-        delegateSmartAccount.address,
-      );
+    const delegation = prepareDelegation(
+      delegatorSmartAccount,
+      delegateSmartAccount.address,
+    );
 
-      const signature = await delegatorSmartAccount.signDelegation({
-        delegation,
-      });
+    const signature = await delegatorSmartAccount.signDelegation({
+      delegation,
+    });
 
-      const signedDelegation = {
-        ...delegation,
-        signature,
-      };
-
-      setDelegation(signedDelegation);
-
-      console.log(signedDelegation);
+    const signedDelegation = {
+      ...delegation,
+      signature,
     };
-    handleCreateDelegation();
-  }, [delegatorSmartAccount, delegateSmartAccount]);
+
+    setDelegation(signedDelegation);
+
+    console.log(signedDelegation);
+  };
 
   // Get minimum deposit amount from contract
   const { data: generalConfig } = useContractRead({
@@ -100,8 +98,8 @@ export default function Web3Assessment() {
     chainId: baseSepolia.id,
   }) as {
     data:
-      | [string, string, bigint, bigint, bigint, bigint, bigint, bigint]
-      | undefined;
+    | [string, string, bigint, bigint, bigint, bigint, bigint, bigint]
+    | undefined;
   };
 
   const minDeposit = generalConfig
@@ -348,7 +346,7 @@ export default function Web3Assessment() {
           processQueue();
           */
     };
-    processQueue()
+    processQueue();
   }, [
     bundlerClient,
     delegateSmartAccount,
@@ -385,7 +383,7 @@ export default function Web3Assessment() {
           setCurrentIndex(questions.length - 1);
         }
       }
-    } catch {}
+    } catch { }
   }, [total, address]);
 
   // Persist answers & index continuously
@@ -467,7 +465,7 @@ export default function Web3Assessment() {
         // analytics (fire-and-forget)
         try {
           track("Completed Web3 Assessment");
-        } catch {}
+        } catch { }
 
         // TODO: Add blockchain interaction here
         // For example, storing answers on-chain or minting an NFT
@@ -532,6 +530,34 @@ export default function Web3Assessment() {
         </p>
       ) : null}
 
+      {delegatorSmartAccount && (
+        <>
+          <p>Your delegator Smart Account: {delegatorSmartAccount.address}</p>
+          <p className="mb-4 text-blue-400">
+            <a
+              href={`https://sepolia.basescan.org/address/${delegatorSmartAccount.address}`}
+              target="_blank"
+            >
+              see on sepolia basescan
+            </a>
+          </p>
+        </>
+      )}
+      {!delegation && (
+        <div className="flex-column justify-center items-center mb-6">
+          <p>
+            You need to create a delegation and credit your delegator account to
+            take the assessment
+          </p>
+          <button
+            type="button"
+            className="px-4 py-2 rounded bg-blue-600 text-white disabled:bg-gray-300 disabled:text-gray-600 transition-opacity"
+            onClick={handleCreateDelegation}
+          >
+            CREATE DELEGATION
+          </button>
+        </div>
+      )}
       <div className="mb-8 h-[200px] w-full relative overflow-hidden rounded-lg">
         <div
           ref={containerRef}
@@ -541,81 +567,79 @@ export default function Web3Assessment() {
             position: "relative",
           }}
         >
-          {/*
-
-                    <DynamicGraph
-                        width={dimensions.width}
-                        height={dimensions.height}
-                    />
-          */}
+          {<DynamicGraph width={dimensions.width} height={dimensions.height} />}
         </div>
       </div>
+      {delegation && (
+        <AnimatePresence initial={false}>
+          {visible
+            .slice()
+            .reverse()
+            .map((q, revIdx) => {
+              const idx = visible.length - 1 - revIdx;
+              const isActive = idx === currentIndex;
+              const txStatus = transactionStatuses[q.id];
+              const isAnswered = answers[q.id] !== undefined;
 
-      <AnimatePresence initial={false}>
-        {visible
-          .slice()
-          .reverse()
-          .map((q, revIdx) => {
-            const idx = visible.length - 1 - revIdx;
-            const isActive = idx === currentIndex;
-            const txStatus = transactionStatuses[q.id];
-            const isAnswered = answers[q.id] !== undefined;
-
-            return (
-              <motion.div
-                key={q.id}
-                initial={{ y: isActive ? -10 : 0, opacity: isActive ? 1 : 0.6 }}
-                animate={{ y: 0, opacity: isActive ? 1 : 0.5 }}
-                exit={{ y: 10, opacity: 0 }}
-                transition={ANIM}
-                className={`${isActive ? "mb-8" : "mb-4"} ${isAnswered ? "opacity-75" : ""}`}
-              >
-                <Question
-                  id={q.id}
-                  text={q.text}
-                  value={answers[q.id] ?? 0}
-                  onChange={handleAnswerChange}
-                  isLoading={txStatus?.status === "pending"}
-                  isSuccess={txStatus?.status === "success"}
-                  isAnswered={isAnswered}
-                  explorerButton={
-                    txStatus?.status === "success" &&
-                    txStatus.txHash && (
-                      <button
-                        type="button"
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700 transition text-xs"
-                        onClick={() =>
-                          window.open(
-                            `${BLOCK_EXPLORER_URL}/tx/${txStatus.txHash}`,
-                            "_blank",
-                          )
-                        }
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="lucide lucide-external-link"
-                          viewBox="0 0 24 24"
+              return (
+                <motion.div
+                  key={q.id}
+                  initial={{
+                    y: isActive ? -10 : 0,
+                    opacity: isActive ? 1 : 0.6,
+                  }}
+                  animate={{ y: 0, opacity: isActive ? 1 : 0.5 }}
+                  exit={{ y: 10, opacity: 0 }}
+                  transition={ANIM}
+                  className={`${isActive ? "mb-8" : "mb-4"} ${isAnswered ? "opacity-75" : ""}`}
+                >
+                  <Question
+                    id={q.id}
+                    text={q.text}
+                    value={answers[q.id] ?? 0}
+                    onChange={handleAnswerChange}
+                    isLoading={txStatus?.status === "pending"}
+                    isSuccess={txStatus?.status === "success"}
+                    isAnswered={isAnswered}
+                    explorerButton={
+                      txStatus?.status === "success" &&
+                      txStatus.txHash && (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700 transition text-xs"
+                          onClick={() =>
+                            window.open(
+                              `${BLOCK_EXPLORER_URL}/tx/${txStatus.txHash}`,
+                              "_blank",
+                            )
+                          }
                         >
-                          <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                          <polyline points="15 3 21 3 21 9" />
-                          <line x1="10" x2="21" y1="14" y2="3" />
-                        </svg>
-                        Explorer
-                      </button>
-                    )
-                  }
-                />
-              </motion.div>
-            );
-          })}
-      </AnimatePresence>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-external-link"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" x2="21" y1="14" y2="3" />
+                          </svg>
+                          Explorer
+                        </button>
+                      )
+                    }
+                  />
+                </motion.div>
+              );
+            })}
+        </AnimatePresence>
+      )}
     </form>
   );
 }
