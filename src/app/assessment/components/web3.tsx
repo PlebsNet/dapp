@@ -21,7 +21,6 @@ import { multivaultAbi } from "@/lib/abis/multivault";
 import { baseSepolia } from "viem/chains";
 import { useContractRead } from "wagmi";
 import { useGetTriplesWithPositionsQuery } from "@0xintuition/graphql";
-import { question } from "@/app/(admin)/data/question";
 import useDelegateAccount from "@/hooks/useDelegateAccount";
 import useDelegatorAccount from "@/hooks/useDelegatorAccount";
 import {
@@ -111,7 +110,7 @@ export default function Web3Assessment() {
     where: {
       term_id: { _in: questions.map((q) => q.triple.id) },
     },
-    address: address?.toLowerCase() as `0x${string}`,
+    address: delegatorSmartAccount?.address?.toLowerCase() as `0x${string}`,
   });
   console.log(positionsData);
 
@@ -129,7 +128,7 @@ export default function Web3Assessment() {
 
   // Initialize answers based on positions
   useEffect(() => {
-    if (!positionsData?.triples || !address) return;
+    if (!positionsData?.triples || !delegatorSmartAccount?.address) return;
 
     const newAnswers: Record<string, number> = {};
     let firstUnansweredIndex = -1;
@@ -192,7 +191,7 @@ export default function Web3Assessment() {
     } else {
       setCurrentIndex(firstUnansweredIndex);
     }
-  }, [positionsData, address]);
+  }, [positionsData, delegatorSmartAccount]);
 
   // Process transaction queue
   useEffect(() => {

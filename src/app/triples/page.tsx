@@ -133,7 +133,7 @@ export default function TriplesPage() {
             {/* Access receipt when available: redeemTripleHook.receipt */}
 
             {triples.length === 0 ? (
-                <p className="text-gray-600">You don't have any positions yet.</p>
+                <p className="text-gray-600">You don&apos;t have any positions yet.</p>
             ) : (
                 <div className="flex flex-wrap gap-2">
                     {triples.map((triple: NonNullable<GetTriplesWithPositionsQuery['triples']>[number]) => {
