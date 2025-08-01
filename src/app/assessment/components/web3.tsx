@@ -85,8 +85,6 @@ export default function Web3Assessment() {
     };
 
     setDelegation(signedDelegation);
-
-    console.log(signedDelegation);
   };
 
   // Get minimum deposit amount from contract
@@ -106,13 +104,15 @@ export default function Web3Assessment() {
     : "0.001";
 
   // Get positions for all triples
-  const { data: positionsData } = useGetTriplesWithPositionsQuery({
-    where: {
-      term_id: { _in: questions.map((q) => q.triple.id) },
+  const { data: positionsData } = useGetTriplesWithPositionsQuery(
+    {
+      where: {
+        term_id: { _in: questions.map((q) => q.triple.id) },
+      },
+      address: delegatorSmartAccount?.address?.toLowerCase() as `0x${string}`,
     },
-    address: delegatorSmartAccount?.address?.toLowerCase() as `0x${string}`,
-  });
-  console.log(positionsData);
+    { enabled: !!delegatorSmartAccount }
+  );
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -132,7 +132,6 @@ export default function Web3Assessment() {
 
     const newAnswers: Record<string, number> = {};
     let firstUnansweredIndex = -1;
-    console.log(newAnswers);
 
     questions.forEach((question, index) => {
       const position = positionsData.triples.find(
@@ -145,7 +144,6 @@ export default function Web3Assessment() {
           const shares = Number(
             position.term?.vaults.at(0)?.positions.at(0)?.shares,
           );
-          console.log("Shares", shares);
           if (shares > 0) {
             // 612202501000000
             newAnswers[question.id] = 5; // Slightly Agree
@@ -164,7 +162,6 @@ export default function Web3Assessment() {
           const shares = Number(
             position.counter_term?.vaults.at(0)?.positions.at(0)?.shares,
           );
-          console.log("Shares", shares);
           if (shares > 0) {
             // 612202501000000
             newAnswers[question.id] = 3; // Slightly Disagree
@@ -237,28 +234,30 @@ export default function Web3Assessment() {
         18,
       );
       const handleRedeemDelegation = async () => {
-        console.log("REDEEMING DELEGATION");
         if (
           !delegation ||
           !delegatorSmartAccount ||
-          !pimlicoClient ||
-          !delegateSmartAccount
+          !delegateSmartAccount ||
+          !pimlicoClient
         ) {
-          return;
+          throw new Error("Delegation not initialized");
         }
-        const { fast: fee } = await pimlicoClient?.getUserOperationGasPrice();
+
+        const { fast: fee } = await pimlicoClient.getUserOperationGasPrice();
         const triple = positionsData.triples.find(
           (t) => t.term_id === currentTx.tripleId.toString(),
         );
         if (!triple) {
           throw new Error("Triple not found in positions data");
         }
+
         const redeemData = prepareRedeemDelegation(
           delegation,
           delegatorSmartAccount.address,
           depositAmount,
           triple.term_id,
         );
+
         const userOperationHash = await bundlerClient!.sendUserOperation({
           account: delegateSmartAccount,
           calls: [
@@ -275,75 +274,36 @@ export default function Web3Assessment() {
           hash: userOperationHash,
         });
 
-        console.log("[TRANSACTION HASH]");
-        console.log(receipt.transactionHash);
-
-        //setRedeemDelegationHash(receipt.transactionHash);
+        return receipt.transactionHash as string;
       };
-      handleRedeemDelegation();
 
-      /*
-            try {
-              // Find the triple in positionsData to get the correct vault ID
-              const triple = positionsData.triples.find(
-                (t) => t.term_id === currentTx.tripleId.toString(),
-              );
-              if (!triple) {
-                throw new Error("Triple not found in positions data");
-              }
-      
-              // Get the correct vault ID based on the answer
-              const vaultId =
-      positionsData,
-                answer <= 3 ? BigInt(triple.term_id) : BigInt(triple.counter_term_id);
-      
-              
-              const hash = await writeContractAsync({
-                address: MULTIVAULT_CONTRACT_ADDRESS as `0x${string}`,
-                abi: multivaultAbi as Abi,
-                functionName: "depositTriple",
-                args: [address as `0x${string}`, vaultId],
-                value: depositAmount,
-                chain: baseSepolia,
-              });
-      
-              setTransactionStatuses((prev) => ({
-                ...prev,
-                [currentTx.questionId]: {
-                  questionId: currentTx.questionId,
-                  status: "success",
-                  txHash: hash,
-                },
-              }));
-      
-              onReceipt((receipt) => {
-                console.log("Transaction confirmed:", receipt);
-              });
-            } catch (err) {
-              setTransactionStatuses((prev) => ({
-                ...prev,
-                [currentTx.questionId]: {
-                  questionId: currentTx.questionId,
-                  status: "error",
-                },
-              }));
-              console.error("Error depositing triple:", err);
-              if (err instanceof Error) {
-                setFormError(
-                  `Error: ${err.message}${err.cause ? ` (Cause: ${JSON.stringify(err.cause)})` : ""}`,
-                );
-              } else {
-                setFormError(`An unknown error occurred: ${JSON.stringify(err)}`);
-              }
-            }
-      
-            // Remove processed transaction from queue
-            setPendingTransactions((prev) => prev.slice(1));
-            setIsProcessingQueue(false);
-          };
-      
-          processQueue();
-          */
+      try {
+        const txHash = await handleRedeemDelegation();
+        setTransactionStatuses((prev) => ({
+          ...prev,
+          [currentTx.questionId]: {
+            questionId: currentTx.questionId,
+            status: "success",
+            txHash,
+          },
+        }));
+      } catch (err) {
+        setTransactionStatuses((prev) => ({
+          ...prev,
+          [currentTx.questionId]: {
+            questionId: currentTx.questionId,
+            status: "error",
+          },
+        }));
+        console.error("Error depositing triple:", err);
+        if (err instanceof Error) {
+          setFormError(`Error: ${err.message}`);
+        }
+      }
+
+      setPendingTransactions((prev) => prev.slice(1));
+      setIsProcessingQueue(false);
+
     };
     processQueue();
   }, [
@@ -481,9 +441,7 @@ export default function Web3Assessment() {
   const allAnswered = Object.keys(answers).length === total;
   const answeredCount = Object.keys(answers).length;
   const remainingCount = total - answeredCount;
-  const visible = questions;
-  console.log(questions);
-  console.log(visible);
+  const visible = questions.slice(0, answeredCount + 1);
 
   return (
     <form onSubmit={handleSubmit} className="p-4 max-w-2xl mx-auto">
