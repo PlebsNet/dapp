@@ -16,6 +16,7 @@ import { parseUnits } from 'viem';
 import { Abi } from 'viem';
 import { multivaultAbi } from '@/lib/abis/multivault';
 import { baseSepolia } from 'viem/chains';
+import { ExternalLink } from 'lucide-react';
 
 const ANIM = { duration: 0.3 };
 const STORAGE_ANS = "plebs_answers_web3";
@@ -282,18 +283,15 @@ export default function Web3Assessment() {
                                     isSuccess={txStatus?.status === 'success'}
                                     explorerButton={
                                         txStatus?.status === 'success' && txStatus.txHash && (
-                                            <button
-                                                type="button"
-                                                className="flex items-center gap-1 px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700 transition text-xs"
-                                                onClick={() => window.open(`${BLOCK_EXPLORER_URL}/tx/${txStatus.txHash}`, '_blank')}
+                                            <a
+                                                href={`${BLOCK_EXPLORER_URL}/tx/${txStatus.txHash}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-400 hover:underline flex items-center gap-1 text-xs"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link" viewBox="0 0 24 24">
-                                                    <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                                    <polyline points="15 3 21 3 21 9" />
-                                                    <line x1="10" x2="21" y1="14" y2="3" />
-                                                </svg>
-                                                Explorer
-                                            </button>
+                                                {txStatus.txHash}
+                                                <ExternalLink className="w-4 h-4" />
+                                            </a>
                                         )
                                     }
                                 />

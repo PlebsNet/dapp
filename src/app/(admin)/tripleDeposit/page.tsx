@@ -9,6 +9,7 @@ import { useDepositTriple } from '@/hooks/useDepositTriple'
 import { multivaultAbi } from '@/lib/abis/multivault'
 import { useChainId } from 'wagmi'
 import { baseSepolia } from 'viem/chains'
+import { ExternalLink } from 'lucide-react'
 
 export default function TripleDepositPage() {
     const { address } = useAccount()
@@ -168,9 +169,10 @@ export default function TripleDepositPage() {
                                 href={`${BLOCK_EXPLORER_URL}/tx/${txHash}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-400 hover:underline"
+                                className="text-blue-400 hover:underline flex items-center gap-1"
                             >
                                 {txHash}
+                                <ExternalLink className="w-4 h-4" />
                             </a>
                         </div>
                     )}
