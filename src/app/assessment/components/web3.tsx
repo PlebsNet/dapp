@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 import { track } from "@vercel/analytics";
 import Question from "./Question";
 import { questions } from "./questions";
-//import DynamicGraph from "@/components/ForceGraph3D";
+import DynamicGraph from "@/components/ForceGraph3D";
 import { useContainerSize } from "@/hooks/useContainerSize";
 import { useAccount, useChainId } from "wagmi";
 import { useDepositTriple } from "@/hooks/useDepositTriple";
@@ -32,7 +32,6 @@ import {
   getDeleGatorEnvironment,
 } from "@metamask/delegation-toolkit";
 import usePimlicoUtils from "@/hooks/usePimlicoUtils";
-import DynamicGraph from "@/components/ForceGraph3D";
 
 const ANIM = { duration: 0.3 };
 const STORAGE_ANS = "plebs_answers_web3";
@@ -524,7 +523,7 @@ export default function Web3Assessment() {
             position: "relative",
           }}
         >
-          {<DynamicGraph width={dimensions.width} height={dimensions.height} />}
+          {<DynamicGraph width={dimensions.width} height={dimensions.height} address={delegatorSmartAccount?.address} />}
         </div>
       </div>
       {delegation && (
