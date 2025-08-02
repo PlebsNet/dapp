@@ -20,11 +20,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/lib/graphql";
 
 const httpLink = createHttpLink({
-  uri: 'https://dev.base-sepolia.intuition-api.com/v1/graphql',
+  uri: 'https://prod.base.intuition-api.com/v1/graphql',
 });
 
 const wsLink = new GraphQLWsLink(createClient({
-  url: 'wss://dev.base-sepolia.intuition-api.com/v1/graphql',
+  url: 'wss://prod.base.intuition-api.com/v1/graphql',
 }));
 
 const splitLink = split(
