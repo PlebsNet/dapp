@@ -1,107 +1,115 @@
-'use client';
+"use client";
+import Image from "next/image";
+import Link from "next/link";
 
-import { gql, useQuery } from '@apollo/client';
-import Image from 'next/image';
-import { useParams } from 'next/navigation';
 
-const MEMBERS_QUERY = gql`
-  query GetMembersByLabel($label: String!) {
-    atoms(where: { label: { _eq: $label } }) {
-      id
-      as_object_triples(where: { predicate_id: { _eq: 1 } }) {
-        subject {
-          id
-          label
-          image
-          wallet_id
-        }
-      }
-    }
-  }
-`;
-
-interface MemberSubject {
-  id: string;
-  label: string;
-  image?: string;
-  wallet_id?: string;
-}
-
-interface MemberTriple {
-  subject: MemberSubject;
-}
-
-const mockMembers: MemberTriple[] = [
+// --- MOCK DATA for local testing ---
+// Remove this block when switching to real data
+const members = [
   {
-    subject: {
-      id: 'mock-1',
-      label: 'Alice Mock',
-      image: 'https://i.pravatar.cc/150?img=11',
-      wallet_id: '0x1234...abcd',
-    },
+    id: "mock-1",
+    name: "Alice Mock",
+    image: "https://i.pravatar.cc/150?img=11",
+    ethAddress: "0x1234...abcd",
+    answers: { Q1: 2, Q2: 1, Q3: 3, Q4: 0, Q5: 2 },
   },
   {
-    subject: {
-      id: 'mock-2',
-      label: 'Bob Mock',
-      image: 'https://i.pravatar.cc/150?img=22',
-      wallet_id: '0x5678...efgh',
-    },
+    id: "mock-2",
+    name: "Bob Mock",
+    image: "https://i.pravatar.cc/150?img=12",
+    ethAddress: "0x5678...efgh",
+    answers: { Q1: 1, Q2: 2, Q3: 2, Q4: 1, Q5: 3 },
   },
   {
-    subject: {
-      id: 'mock-3',
-      label: 'Charlie Mock',
-      image: '',
-      wallet_id: '0x9abc...1234',
-    },
+    id: "mock-3",
+    name: "Charlie Mock",
+    image: "https://i.pravatar.cc/150?img=13",
+    ethAddress: "0x9abc...ijkl",
+    answers: { Q1: 3, Q2: 0, Q3: 1, Q4: 2, Q5: 2 },
+  },
+  {
+    id: "mock-4",
+    name: "Diana Mock",
+    image: "https://i.pravatar.cc/150?img=14",
+    ethAddress: "0xmnop...qrst",
+    answers: { Q1: 2, Q2: 2, Q3: 2, Q4: 2, Q5: 2 },
+  },
+  {
+    id: "mock-5",
+    name: "Eve Mock",
+    image: "https://i.pravatar.cc/150?img=15",
+    ethAddress: "0xuvwx...yzab",
+    answers: { Q1: 0, Q2: 3, Q3: 1, Q4: 3, Q5: 0 },
   },
 ];
-
 export default function MembersPage() {
-  const { daoId } = useParams();
-  const label = decodeURIComponent(daoId as string);
+  // MOCK: Use mock data for local visualization
 
-  const { data, loading, error } = useQuery(MEMBERS_QUERY, {
-    variables: { label },
-  });
 
-  const members: MemberTriple[] =
-    data?.atoms?.[0]?.as_object_triples?.length > 0
-      ? data.atoms[0].as_object_triples
-      : mockMembers;
 
-  if (loading) return <p className="p-6">Loading members...</p>;
-  if (error) return <p className="p-6 text-red-600">Error: {error.message}</p>;
+  // --- REAL DATA: Uncomment this block and remove the mock above---
+  /*
+  import { gql, useQuery } from "@apollo/client";
+  import { useParams } from "next/navigation";
+
+  const MEMBER_PROFILE_QUERY = gql`
+    query GetMemberProfile($memberId: String!) {
+      users(where: { id: { _eq: $memberId } }) {
+        id
+        name
+        image
+        ethAddress
+        answers
+      }
+    }
+  `;
+
+  export default function MemberProfilePage() {
+    const { memberId } = useParams();
+    const { data, loading, error } = useQuery(MEMBER_PROFILE_QUERY, {
+      variables: { memberId },
+    });
+    const member = data?.users?.[0];
+
+    if (loading) return <div>Loading…</div>;
+    if (error) return <div className="text-red-600">Error: {error.message}</div>;
+    if (!member) return <div>No member found.</div>;
+
+    const { profile } = useAssessmentScores(member.answers);
+    const primaryArchetype = profile?.[0];
+    // ...the rest of the render is identical
+  */
+  // --- END REAL DATA ---
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <h1 className="text-2xl font-bold mb-6">DAO Contributors</h1>
-      <div className="grid grid-cols-1 divide-y border rounded-lg shadow">
-        {members.map(({ subject }) => (
-          <div key={subject.id} className="flex items-center gap-4 p-4">
-            {subject.image && subject.image.trim() !== '' ? (
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
+      {members.map((member) => (
+        <Link
+          key={member.id}
+          href={`/daos/slug/members/${member.id}`}
+          className="block"
+        >
+          <div className="flex items-center gap-4 p-4 bg-gray-900 rounded-lg border border-amber-400/30 shadow-lg shadow-amber-400/10 hover:shadow-amber-400/20 transition-all cursor-pointer">
+            {member.image ? (
               <Image
-                src={subject.image}
-                alt={subject.label}
-                width={48}
-                height={48}
+                src={member.image}
+                alt={member.name || member.ethAddress}
+                width={64}
+                height={64}
                 className="rounded-full"
               />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-xs text-white">
+              <div className="w-16 h-16 rounded-full bg-gray-300 flex items-center justify-center text-2xl text-white">
                 ?
               </div>
             )}
             <div>
-              <p className="font-semibold">{subject.label || 'Anonymous'}</p>
-              <p className="text-sm text-gray-500">
-                {subject.wallet_id?.slice(0, 6)}…{subject.wallet_id?.slice(-4)}
-              </p>
+              <h2 className="text-2xl font-bold text-white">{member.name || "Anonymous"}</h2>
+              <p className="text-gray-400">{member.ethAddress}</p>
             </div>
           </div>
-        ))}
-      </div>
+        </Link>
+      ))}
     </div>
   );
 }

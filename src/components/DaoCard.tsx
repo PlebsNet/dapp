@@ -20,7 +20,7 @@ export default function DaoCard({ dao }: { dao: Dao }) {
   const votes = dao.vault?.position_count ?? 0;
 
   return (
-    <Link href={`/daos/${dao.id}/members`} className="block group">
+    <Link href={`/daos/${dao.id}/description`} className="block group">
       <div className="rounded-xl overflow-hidden border border-gray-200 bg-white group-hover:shadow-lg transition-shadow duration-200">
         <div className="h-16 bg-gradient-to-r from-gray-100 to-gray-200" />
 

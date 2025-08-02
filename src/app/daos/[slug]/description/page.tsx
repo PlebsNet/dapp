@@ -56,21 +56,21 @@ export default function DaoDescriptionPage() {
         ) : (
           <div className="w-16 h-16 bg-gray-200 rounded-full" />
         )}
-        <h1 className="text-2xl font-bold">{dao.label}</h1>
+        <h1 className="text-2xl font-bold text-white">{dao.label}</h1>
       </div>
 
-      <p className="text-gray-700 whitespace-pre-line mb-6">
+      <p className="text-gray-500 whitespace-pre-line mb-6">
         {dao.value?.thing?.description || 'No description provided.'}
       </p>
 
       {dao.value?.thing?.url && (
         <a
-          href={dao.value.thing.url}
+          href={dao.website}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 transition-colors"
+          className="inline-block bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 transition"
         >
-          Visit official website
+          Visit website
         </a>
       )}
 
