@@ -57,11 +57,12 @@ export default function Question({
         >
           {ticks.map((t) => (
             <label
+
               key={t.value}
               htmlFor={`${id}-${t.value}`}
               className="flex flex-col items-center cursor-pointer"
             >
-              {(isSuccess && value === t.value) || (isAnswered && value === t.value) ? (
+              {(isSuccess && value === t.value) || (isSuccess && value === t.value) ? (
                 <div className={`w-5 h-5 rounded-full border-2 ${t.color}`} />
               ) : isLoading && value === t.value ? (
                 <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
