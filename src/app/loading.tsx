@@ -50,7 +50,7 @@ export default function Loading() {
       // Random delay before starting the animation cycle for shape i
       const delay = 100 + Math.random() * 2000;
 
-      shapeTimers.current[i] = window.setTimeout(() => {
+      const timer = window.setTimeout(() => {
         // Fade out the current shape by setting opacity to 0
         setShapes((prev) => {
           const next = [...prev];
@@ -83,20 +83,37 @@ export default function Loading() {
           }, 50); // Small delay before fade in to prevent flicker
         }, 300); // Wait for fade out to complete before changing shape and rotation
       }, delay);
+
+      return timer;
     };
 
     // Randomly select one shape to start its animation loop immediately
     const first = Math.floor(Math.random() * shapes.length);
-    startLoop(first);
+    const firstTimer = startLoop(first);
+    shapeTimers.current[first] = firstTimer;
 
     // Schedule animation loops for all other shapes with randomized delays
     shapes.forEach((_, i) => {
-      if (i !== first) startLoop(i);
+      if (i !== first) {
+        const timer = startLoop(i);
+        shapeTimers.current[i] = timer;
+      }
     });
 
     // Cleanup all scheduled timeouts when component unmounts
-    return () => shapeTimers.current.forEach(clearTimeout);
-  }, []);
+    return () => {
+      shapeTimers.current.forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, [shapes]);
+
+  useEffect(() => {
+    const currentTimers = shapeTimers.current;
+    return () => {
+      currentTimers.forEach(timer => clearTimeout(timer));
+    };
+  }, [shapes]);
 
   return (
     <div

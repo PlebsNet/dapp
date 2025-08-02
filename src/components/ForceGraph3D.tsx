@@ -55,11 +55,14 @@ interface Atom {
   __typename: string;
 }
 
-interface Claim {
-  subject: Atom;
-  predicate: Atom;
-  object: Atom;
-  __typename: string;
+interface Position {
+  term: {
+    triple: {
+      subject: Atom;
+      predicate: Atom;
+      object: Atom;
+    }
+  }
 }
 
 interface DynamicGraphProps {
@@ -68,29 +71,31 @@ interface DynamicGraphProps {
 }
 
 const CLAIMS_SUBSCRIPTION = gql`
-  subscription Subscription_root($where: claims_bool_exp) {
-    claims(where: $where) {
-      subject {
-        label
-        __typename
+subscription Positions($where: positions_bool_exp) {
+  positions(where: $where) {
+    term {
+      triple {
+        subject {
+          label
+        }
+        predicate {
+          label
+        }
+        object {
+          label
+        }
       }
-      predicate {
-        label
-        __typename
-      }
-      object {
-        label
-        __typename
-      }
-      __typename
     }
   }
+}
 `;
 
-export default function DynamicGraph({ width, height }: DynamicGraphProps) {
+type Address = `0x${string}` | undefined;
+
+export default function DynamicGraph({ width, height, address }: DynamicGraphProps & { address: Address }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraph3DInstance | null>(null);
-  const { address } = useAccount();
+
   const [data, setData] = useState<GraphData>({ nodes: [], links: [] });
   const nodeMapRef = useRef<Map<string, Node>>(new Map());
   const [isGraphLoaded, setIsGraphLoaded] = useState(false);
@@ -104,6 +109,7 @@ export default function DynamicGraph({ width, height }: DynamicGraphProps) {
   }, []);
 
   useEffect(() => {
+    console.log('fgRef.current', fgRef.current);
     if (!fgRef.current) return;
 
     // Initialize camera position first
@@ -126,15 +132,22 @@ export default function DynamicGraph({ width, height }: DynamicGraphProps) {
     variables: {
       where: {
         account_id: {
-          _eq: address?.toLowerCase() || ''
+          _eq: address
+        },
+        term: {
+          triple_id: {
+            _is_null: false
+          }
         }
       }
     }
   });
 
   useEffect(() => {
-    if (subscriptionData?.claims) {
-      const claims = subscriptionData.claims as Claim[];
+    console.log('subscriptionData', subscriptionData);
+    if (subscriptionData?.positions) {
+      // Type Position is not defined, so use 'any' for now
+      const positions = subscriptionData.positions as Position[];
 
       // Reset the node map and data for a fresh start
       nodeMapRef.current.clear();
@@ -142,37 +155,37 @@ export default function DynamicGraph({ width, height }: DynamicGraphProps) {
       const newLinks: Link[] = [];
 
       // First pass: create all nodes (including predicates)
-      claims.forEach(claim => {
+      positions.forEach(position => {
         // Add subject node
-        if (!nodeMapRef.current.has(claim.subject.label)) {
-          const subjectNode = { id: claim.subject.label, label: claim.subject.label };
+        if (!nodeMapRef.current.has(position.term.triple.subject.label)) {
+          const subjectNode = { id: position.term.triple.subject.label, label: position.term.triple.subject.label };
           newNodes.push(subjectNode);
-          nodeMapRef.current.set(claim.subject.label, subjectNode);
+          nodeMapRef.current.set(position.term.triple.subject.label, subjectNode);
         }
 
         // Add predicate node
-        const predicateId = `predicate_${claim.predicate.label}`;
+        const predicateId = `predicate_${position.term.triple.predicate.label}`;
         if (!nodeMapRef.current.has(predicateId)) {
-          const predicateNode = { id: predicateId, label: claim.predicate.label };
+          const predicateNode = { id: predicateId, label: position.term.triple.predicate.label };
           newNodes.push(predicateNode);
           nodeMapRef.current.set(predicateId, predicateNode);
         }
 
         // Add object node
-        if (!nodeMapRef.current.has(claim.object.label)) {
-          const objectNode = { id: claim.object.label, label: claim.object.label };
+        if (!nodeMapRef.current.has(position.term.triple.object.label)) {
+          const objectNode = { id: position.term.triple.object.label, label: position.term.triple.object.label };
           newNodes.push(objectNode);
-          nodeMapRef.current.set(claim.object.label, objectNode);
+          nodeMapRef.current.set(position.term.triple.object.label, objectNode);
         }
       });
 
       // Second pass: create links connecting through predicates
-      claims.forEach(claim => {
-        const predicateId = `predicate_${claim.predicate.label}`;
+      positions.forEach(position => {
+        const predicateId = `predicate_${position.term.triple.predicate.label}`;
 
         // Link from subject to predicate
         newLinks.push({
-          source: claim.subject.label,
+          source: position.term.triple.subject.label,
           target: predicateId,
           label: ''
         });
@@ -180,7 +193,7 @@ export default function DynamicGraph({ width, height }: DynamicGraphProps) {
         // Link from predicate to object
         newLinks.push({
           source: predicateId,
-          target: claim.object.label,
+          target: position.term.triple.object.label,
           label: ''
         });
       });
